@@ -1,87 +1,61 @@
+
 # Spoofing Project
 
-This project is designed to demonstrate a Man-in-the-Middle (MitM) attack using a Flask web server. The primary goal is to understand how data can be intercepted and manipulated between clients and servers.
-
-## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [How to Start the Project](#how-to-start-the-project)
-- [License](#license)
-- [Contributing](#contributing)
-- [Acknowledgments](#acknowledgments)
+This project implements ARP spoofing, DNS spoofing, and a simple web server using Flask. It is designed to demonstrate the potential security vulnerabilities in local networks.
 
 ## Features
 
-- Captures and logs HTTP requests and responses.
-- Provides a simple web interface to display intercepted data.
-- Demonstrates the vulnerability of HTTP connections.
+- ARP Spoofing
+- DNS Spoofing
+- Redirecting users to a specified URL using a web server
 
-## Installation
+## Requirements
 
-Follow the steps below to set up the project on your local machine:
+Before you begin, ensure you have met the following requirements:
 
-1. **Clone the repository**:
+- Python 3.x
+- Scapy
+- Flask
 
+You can install the required packages using pip or requirements.txt:
+
+```bash
+pip install scapy flask
+```
+
+## Code Structure
+
+The project contains the following main components:
+
+- `arp_spoof.py`: Contains the `ARPSpoofer` class for ARP spoofing functionality.
+- `dns_spoof.py`: Contains the `DNSSpoofer` class for DNS spoofing functionality.
+- `web_server.py`: Contains the `WEBServer` class for the web server that handles redirection.
+- `main.py`: The entry point of the application, which initializes the spoofers and starts them using multi-threading.
+
+## How to Start
+
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/yourusername/spoofing-project.git
    cd spoofing-project
    ```
 
-2. **Create a virtual environment** (optional but recommended):
+2. **Configure the parameters in `main.py`:**
+   - Update the `victim_ip`, `router_ip`, `attacker_ip`, `attacker_mac`, and `redirect_to` variables with appropriate values.
 
+3. **Run the application:**
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On macOS/Linux
-   venv\Scripts\activate  # On Windows
+   python main.py
    ```
 
-3. **Install the required dependencies**:
+4. **Stop the attack:**
+   - To stop the spoofing attack, press `Ctrl + C` in the terminal.
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Important Notes
 
-## Usage
-
-Before running the project, ensure you have the necessary permissions and that you understand the ethical implications of this type of project. Use it only in a controlled environment and for educational purposes.
-
-## How to Start the Project
-
-1. **Obtain SSL Certificates**:
-   If you are running the application over HTTPS, make sure to obtain SSL certificates using Let's Encrypt or generate self-signed certificates.
-
-2. **Run the Flask Server**:
-
-   Open a terminal and run the following command:
-
-   ```bash
-   python web_server.py
-   ```
-
-   The server will start listening on `0.0.0.0` at port 80 (HTTP) or port 443 (HTTPS, if configured).
-
-3. **Access the Web Interface**:
-
-   Open a web browser and go to:
-
-   - For HTTP: `http://localhost:80`
-   - For HTTPS: `https://localhost:443`
-
-4. **Start Intercepting**:
-   The application will capture HTTP requests and display them in the web interface.
+- This project is for educational purposes only. Ensure you have permission to test on the network you are working with.
+- Misuse of this code can lead to legal consequences.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please fork the repository and create a pull request for any improvements or features.
-
-## Acknowledgments
-
-- Flask for the web framework.
-- Let's Encrypt for providing free SSL certificates.
-- Any other libraries or tools you used.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
